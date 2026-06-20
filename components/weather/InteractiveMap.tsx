@@ -13,8 +13,7 @@ interface InteractiveMapProps {
   onSelect: (lat: number, lon: number) => void;
 }
 
-const MAPBOX_TOKEN =
-  'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+
 
 const LAYERS = [
   {
@@ -61,10 +60,10 @@ export function InteractiveMap({ lat, lon, language, isRTL, onSelect }: Interact
       });
 
       // Mapbox street tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+         maxZoom: 19,
+       }).addTo(map);
 
       // Weather overlay
       if (API_KEY) {
