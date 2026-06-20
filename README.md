@@ -1,4 +1,4 @@
-# 🌤 Taqsak (تقسك)
+# 🌤 Taqsak (طقسك)
 
 **Your weather, anywhere.** A modern, bilingual (Arabic/English) weather forecast web app built with Next.js 16, TypeScript, and Tailwind CSS.
 
