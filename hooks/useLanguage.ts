@@ -6,9 +6,11 @@ import { translations } from '@/lib/i18n';
 
 const STORAGE_KEY = 'taqsak_language';
 
+const RTL_LANGUAGES: Language[] = ['ar'];
+
 function applyLanguage(lang: Language) {
   document.documentElement.setAttribute('lang', lang);
-  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.documentElement.setAttribute('dir', RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr');
 }
 
 export function useLanguage() {
@@ -29,16 +31,37 @@ export function useLanguage() {
     applyLanguage(lang);
   }, []);
 
-  const toggleLanguage = useCallback(() => {
-    setLanguage(language === 'en' ? 'ar' : 'en');
+  const cycleLanguage = useCallback(() => {
+    const languages: Language[] = ['en', 'ar', 'fr', 'es'];
+    const currentIndex = languages.indexOf(language);
+    const nextLanguage = languages[(currentIndex + 1) % languages.length];
+    setLanguage(nextLanguage);
   }, [language, setLanguage]);
 
   const t = useCallback(
     (key: keyof typeof translations.en): string => {
-      return (translations[language][key] as string) ?? key;
+      const langData = translations[language] ?? translations.en;
+      return (langData[key] as string) ?? (translations.en[key] as string) ?? key;
     },
     [language]
   );
 
-  return { language, setLanguage, toggleLanguage, t, isRTL: language === 'ar', mounted };
+  const isRTL = RTL_LANGUAGES.includes(language);
+
+  const languageLabel: Record<Language, string> = {
+    en: 'EN',
+    ar: 'ع',
+    fr: 'FR',
+    es: 'ES',
+  };
+
+  return {
+    language,
+    setLanguage,
+    cycleLanguage,
+    t,
+    isRTL,
+    mounted,
+    languageLabel: languageLabel[language],
+  };
 }

@@ -9,32 +9,52 @@ import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUnit } from '@/hooks/useUnit';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useUVIndex } from '@/hooks/useUVIndex';
+import { useMultiLocation } from '@/hooks/useMultiLocation';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { isDay } from '@/lib/utils';
 
 import { Header } from '@/components/layout/Header';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { FavoriteLocations } from '@/components/layout/FavoriteLocations';
+import { Footer } from '@/components/layout/Footer';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
 import { HourlyForecast } from '@/components/weather/HourlyForecast';
 import { DailyForecast } from '@/components/weather/DailyForecast';
 import { TemperatureChart } from '@/components/weather/TemperatureChart';
+import { WindHumidityChart } from '@/components/weather/WindHumidityChart';
+import { UVIndexCard } from '@/components/weather/UVIndexCard';
 import { WeatherBackground } from '@/components/weather/WeatherBackground';
+import { MultiLocationView } from '@/components/weather/MultiLocationView';
+import { Hero } from '@/components/home/Hero';
+import { RecentSearches } from '@/components/home/RecentSearches';
 import { LoadingState } from '@/components/states/LoadingState';
 import { ErrorState } from '@/components/states/ErrorState';
-import { EmptyState } from '@/components/states/EmptyState';
 
-const WeatherMap = dynamic(
-  () => import('@/components/weather/WeatherMap').then((m) => m.WeatherMap),
+const InteractiveMap = dynamic(
+  () => import('@/components/weather/InteractiveMap').then((m) => m.InteractiveMap),
   { ssr: false }
 );
 
 export default function HomePage() {
-  const { language, toggleLanguage, isRTL, t, mounted: langMounted } = useLanguage();
+  const { language, cycleLanguage, isRTL, t, mounted: langMounted, languageLabel } = useLanguage();
   const { theme, toggleTheme, mounted: themeMounted } = useTheme();
   const { unit, toggleUnit } = useUnit();
-  const { current, forecast, loading, error, fetchWeather, clearError } = useWeather();
+  const { current, forecast, loading, error, fetchWeather, clearError, clearWeather } =
+    useWeather();
   const { favorites, toggleFavorite, removeFavorite, isFavorite } = useFavorites();
   const { loading: geoLoading, locate } = useGeolocation();
+  const { uvi, fetch: fetchUVIndex } = useUVIndex();
+  const { recent, addRecent } = useRecentSearches();
+  const {
+    locations: multiLocations,
+    addLocation,
+    removeLocation: removeMultiLocation,
+    loading: multiLoading,
+    canAdd,
+    max: maxLocations,
+  } = useMultiLocation();
+
   const [activeCoords, setActiveCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [isMobile, setIsMobile] = useState(true);
 
@@ -49,13 +69,24 @@ export default function HomePage() {
     (lat: number, lon: number) => {
       setActiveCoords({ lat, lon });
       fetchWeather(lat, lon, unit, language);
+      fetchUVIndex(lat, lon);
     },
-    [fetchWeather, unit, language]
+    [fetchWeather, fetchUVIndex, unit, language]
   );
 
+  const handleClear = useCallback(() => {
+    setActiveCoords(null);
+    clearError();
+  }, [clearError]);
+
   const handleSearch = useCallback(
-    (result: SearchResult) => loadWeather(result.lat, result.lon),
-    [loadWeather]
+    (result: SearchResult) => {
+      const displayName =
+        language === 'ar' && result.local_names?.ar ? result.local_names.ar : result.name;
+      addRecent(displayName, result.country, result.lat, result.lon);
+      loadWeather(result.lat, result.lon);
+    },
+    [loadWeather, addRecent, language]
   );
 
   const handleFavoriteSelect = useCallback(
@@ -87,8 +118,9 @@ export default function HomePage() {
     if (activeCoords) {
       const newUnit: TemperatureUnit = unit === 'metric' ? 'imperial' : 'metric';
       fetchWeather(activeCoords.lat, activeCoords.lon, newUnit, language);
+      fetchUVIndex(activeCoords.lat, activeCoords.lon);
     }
-  }, [toggleUnit, unit, activeCoords, fetchWeather, language]);
+  }, [toggleUnit, unit, activeCoords, fetchWeather, fetchUVIndex, language]);
 
   const dayTime = current ? isDay(current.sys.sunrise, current.sys.sunset, current.dt) : true;
 
@@ -124,13 +156,24 @@ export default function HomePage() {
       )}
 
       {!loading && !error && !current && (
-        <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <EmptyState title={t('emptyTitle')} description={t('emptyDesc')} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <RecentSearches
+            recent={recent}
+            language={language}
+            isRTL={isRTL}
+            onSelect={(lat, lon) => loadWeather(lat, lon)}
+          />
+          <Hero
+            language={language}
+            isRTL={isRTL}
+            onQuickSelect={(lat, lon) => loadWeather(lat, lon)}
+          />
         </div>
       )}
 
       {!loading && !error && current && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Current weather */}
           <div style={{ position: 'relative', borderRadius: '1.5rem', overflow: 'hidden' }}>
             <WeatherBackground
               conditionId={current.weather[0].id}
@@ -149,36 +192,75 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* UV Index & Heat Index */}
+          <UVIndexCard
+            uvi={uvi}
+            temp={current.main.temp}
+            humidity={current.main.humidity}
+            language={language}
+            unit={unit}
+            isRTL={isRTL}
+          />
+
           {forecast && (
             <>
               <TemperatureChart forecast={forecast} language={language} unit={unit} isRTL={isRTL} />
-              <HourlyForecast forecast={forecast} language={language} unit={unit} isRTL={isRTL} />
-              <DailyForecast forecast={forecast} language={language} unit={unit} isRTL={isRTL} />
-              <WeatherMap
-                lat={current.coord.lat}
-                lon={current.coord.lon}
+              <WindHumidityChart
+                forecast={forecast}
                 language={language}
+                unit={unit}
                 isRTL={isRTL}
               />
+              <HourlyForecast forecast={forecast} language={language} unit={unit} isRTL={isRTL} />
+              <DailyForecast forecast={forecast} language={language} unit={unit} isRTL={isRTL} />
             </>
           )}
+
+          {/* Multi location */}
+          <MultiLocationView
+            locations={multiLocations}
+            onAdd={(name, country, lat, lon) =>
+              addLocation(name, country, lat, lon, unit, language)
+            }
+            onRemove={removeMultiLocation}
+            onSelect={(lat, lon) => loadWeather(lat, lon)}
+            loading={multiLoading}
+            canAdd={canAdd}
+            max={maxLocations}
+            language={language}
+            unit={unit}
+            isRTL={isRTL}
+          />
+
+          <InteractiveMap
+            lat={current.coord.lat}
+            lon={current.coord.lon}
+            language={language}
+            isRTL={isRTL}
+            onSelect={(lat, lon) => loadWeather(lat, lon)}
+          />
         </div>
       )}
     </>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div
+      className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
       <Header
         language={language}
         theme={theme}
         unit={unit}
         onToggleTheme={toggleTheme}
-        onToggleLanguage={toggleLanguage}
+        onCycleLanguage={cycleLanguage}
         onToggleUnit={handleToggleUnit}
         onGeolocate={handleGeolocate}
         geoLoading={geoLoading}
         isRTL={isRTL}
+        languageLabel={languageLabel}
+        onLogoClick={handleClear}
       />
 
       <main
@@ -186,21 +268,26 @@ export default function HomePage() {
           maxWidth: '1280px',
           margin: '0 auto',
           padding: isMobile ? '16px 12px' : '32px 24px',
+          flex: 1,
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
-        {/* Search */}
         <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
-          <SearchBar onSelect={handleSearch} language={language} isRTL={isRTL} />
+          <SearchBar
+            onSelect={handleSearch}
+            onClear={handleClear}
+            language={language}
+            isRTL={isRTL}
+          />
         </div>
 
         {isMobile ? (
-          /* Mobile layout */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {weatherContent}
             {favoritesPanel}
           </div>
         ) : (
-          /* Desktop layout */
           <div
             style={{
               display: 'flex',
@@ -209,7 +296,7 @@ export default function HomePage() {
               alignItems: 'flex-start',
             }}
           >
-            <aside style={{ width: '256px', flexShrink: 0, position: 'sticky', top: '96px' }}>
+            <aside style={{ width: '256px', flexShrink: 0, position: 'sticky', top: '80px' }}>
               {favoritesPanel}
             </aside>
             <div
@@ -226,6 +313,8 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      <Footer language={language} isRTL={isRTL} />
     </div>
   );
 }

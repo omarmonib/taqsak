@@ -5,14 +5,16 @@ import { Search, X, Loader2, MapPin } from 'lucide-react';
 import { SearchResult, Language } from '@/types/weather';
 import { searchLocations } from '@/lib/api';
 import { debounce, cn } from '@/lib/utils';
+import { translations } from '@/lib/i18n';
 
 interface SearchBarProps {
   onSelect: (result: SearchResult) => void;
+  onClear?: () => void;
   language: Language;
   isRTL: boolean;
 }
 
-export function SearchBar({ onSelect, language, isRTL }: SearchBarProps) {
+export function SearchBar({ onSelect, onClear, language, isRTL }: SearchBarProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,17 +91,13 @@ export function SearchBar({ onSelect, language, isRTL }: SearchBarProps) {
     }
   }
 
-  function clearQuery() {
-    setQuery('');
-    setResults([]);
-    setOpen(false);
-    inputRef.current?.focus();
-  }
-
-  const translations = {
-    en: { searchPlaceholder: 'Search city, country or province...' },
-    ar: { searchPlaceholder: 'ابحث عن مدينة، دولة أو محافظة...' },
-  };
+ function clearQuery() {
+   setQuery('');
+   setResults([]);
+   setOpen(false);
+   inputRef.current?.focus();
+   onClear?.();
+ }
 
   return (
     <div ref={containerRef} className="relative w-full max-w-2xl mx-auto">

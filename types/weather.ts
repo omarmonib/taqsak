@@ -95,6 +95,92 @@ export interface ForecastResponse {
   };
 }
 
+export interface WeatherAlert {
+  sender_name: string;
+  event: string;
+  start: number;
+  end: number;
+  description: string;
+  tags: string[];
+}
+
+export interface OneCallResponse {
+  lat: number;
+  lon: number;
+  timezone: string;
+  timezone_offset: number;
+  current: {
+    dt: number;
+    sunrise: number;
+    sunset: number;
+    temp: number;
+    feels_like: number;
+    pressure: number;
+    humidity: number;
+    dew_point: number;
+    uvi: number;
+    clouds: number;
+    visibility: number;
+    wind_speed: number;
+    wind_deg: number;
+    weather: WeatherCondition[];
+  };
+  daily: DailyOneCall[];
+  alerts?: WeatherAlert[];
+}
+
+export interface DailyOneCall {
+  dt: number;
+  sunrise: number;
+  sunset: number;
+  moonrise: number;
+  moonset: number;
+  moon_phase: number;
+  summary?: string;
+  temp: {
+    day: number;
+    min: number;
+    max: number;
+    night: number;
+    eve: number;
+    morn: number;
+  };
+  feels_like: {
+    day: number;
+    night: number;
+    eve: number;
+    morn: number;
+  };
+  pressure: number;
+  humidity: number;
+  dew_point: number;
+  wind_speed: number;
+  wind_deg: number;
+  wind_gust?: number;
+  weather: WeatherCondition[];
+  clouds: number;
+  pop: number;
+  rain?: number;
+  snow?: number;
+  uvi: number;
+}
+
+export interface UVData {
+  uvi: number;
+  heatIndex: number;
+}
+
+export interface SavedLocation {
+  id: string;
+  name: string;
+  nameAr?: string;
+  country: string;
+  lat: number;
+  lon: number;
+  addedAt: number;
+  current?: CurrentWeather;
+}
+
 export interface FavoriteLocation {
   id: string;
   name: string;
@@ -115,7 +201,7 @@ export interface SearchResult {
 }
 
 export type TemperatureUnit = 'metric' | 'imperial';
-export type Language = 'en' | 'ar';
+export type Language = 'en' | 'ar' | 'fr' | 'es';
 export type Theme = 'light' | 'dark';
 
 export interface AppSettings {
